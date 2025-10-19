@@ -18,8 +18,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# This list is now expanded to handle all 30 templates.
-# The regex patterns are anchored with `$` to ensure they match the full string.
 QUERY_PATTERNS = [
     # --- get_ticket_status ---
     (
@@ -53,9 +51,9 @@ QUERY_PATTERNS = [
         lambda m: {"ticket_id": int(m.group(1))}
     ),
 
-    # --- schedule_meeting ---
+    # --- schedule_meeting (FIXED) ---
     (
-        re.compile(r"Book meeting on ([\d-]+) at ([\d:]+) in (.+)\.$"),
+        re.compile(r"Book meeting on ([\d-]+) at ([\d:]+) in (.+)$"), # <-- FIX (removed \.)
         "schedule_meeting",
         lambda m: {"date": m.group(1), "time": m.group(2), "meeting_room": m.group(3)}
     ),
@@ -65,7 +63,7 @@ QUERY_PATTERNS = [
         lambda m: {"date": m.group(1), "time": m.group(2), "meeting_room": m.group(3)}
     ),
     (
-        re.compile(r"Set meeting for ([\d-]+), ([\d:]+) at (.+)\.$"),
+        re.compile(r"Set meeting for ([\d-]+), ([\d:]+) at (.+)$"), # <-- FIX (removed \.)
         "schedule_meeting",
         lambda m: {"date": m.group(1), "time": m.group(2), "meeting_room": m.group(3)}
     ),
@@ -75,9 +73,8 @@ QUERY_PATTERNS = [
         lambda m: {"date": m.group(1), "time": m.group(2), "meeting_room": m.group(3)}
     ),
     (
-        re.compile(r"Schedule meeting on ([\d-]+) in (.+) at ([\d:]+)\.$"),
+        re.compile(r"Schedule meeting on ([\d-]+) in (.+) at ([\d:]+)$"), # <-- FIX (removed \.)
         "schedule_meeting",
-        # Note the re-ordered groups in the lambda!
         lambda m: {"date": m.group(1), "time": m.group(3), "meeting_room": m.group(2)}
     ),
     (
@@ -192,16 +189,13 @@ async def root():
 @app.get("/execute")
 async def execute_query(q: str = Query(..., description="The user's natural language query.")):
     
-    # Iterate through the new, expanded list of patterns
     for pattern, func_name, arg_extractor in QUERY_PATTERNS:
-        # Use re.fullmatch() to ensure the pattern matches the *entire* query string
         match = re.fullmatch(pattern, q)
         
         if match:
             try:
                 arguments = arg_extractor(match)
                 
-                # The output format (with json.dumps) remains the same
                 return {
                     "name": func_name,
                     "arguments": json.dumps(arguments)
@@ -213,7 +207,6 @@ async def execute_query(q: str = Query(..., description="The user's natural lang
                     content={"error": f"Error processing query: {e}"}
                 )
 
-    # If no pattern matches, return the 404 response
     return JSONResponse(
         status_code=404,
         content={
